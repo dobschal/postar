@@ -6,6 +6,22 @@ class Storage
     
     // - - - - - - - - - - - - PUBLIC - - - - - - - - - - - - 
 
+    static remove( collection, query )
+    {
+        if( locks[ collection] ) throw Error("DB Error: Tried to change locked collection.");
+        locks[ collection ] = true;
+        const contentAsString = window.localStorage.getItem( collection );
+        if( !contentAsString ) return true;
+        const content = JSON.parse( contentAsString );
+        if( !Array.isArray( content ) ) return true;        
+        let stil = content.filter( item => {
+            return !this._resolvesQuery( item, query );
+        });
+        const itemsAsString = JSON.stringify( stil );
+        window.localStorage.setItem( collection, itemsAsString );
+        locks[ collection ] = false;
+    }
+
     static get( collection, query )
     {
         const contentAsString = window.localStorage.getItem( collection );
@@ -13,13 +29,13 @@ class Storage
         const content = JSON.parse( contentAsString );
         if( !Array.isArray( content ) ) return [];        
         return content.filter( item => {
-            return _resolvesQuery( item, query );
+            return this._resolvesQuery( item, query );
         });
     }
 
     static exists( collection, query )
     {
-        const values = this.get( collction, query );
+        const values = this.get( collection, query );
         return ( values.length > 0 );
     }
 
@@ -42,13 +58,13 @@ class Storage
         locks[ collection ] = false;
     }
 
-    static update( collction, query, updates )
+    static update( collection, query, updates )
     {
         if( locks[ collection] ) throw Error("DB Error: Tried to change locked collection.");
         locks[ collection ] = true;
         const items = this.get( collection, {} );
         const updatedItems = items.map( item => {
-            if( _resolvesQuery( item, query ) )
+            if( this._resolvesQuery( item, query ) )
             {
                 for (const key in updates) {
                     if (updates.hasOwnProperty(key)) {
@@ -63,13 +79,13 @@ class Storage
         locks[ collection ] = false;
     }
 
-    static set( collction, query, obj )
+    static set( collection, query, obj )
     {
         if( locks[ collection] ) throw Error("DB Error: Tried to change locked collection.");
         locks[ collection ] = true;
         const items = this.get( collection, {} );
         const updatedItems = items.map( item => {
-            if( _resolvesQuery( item, query ) )
+            if( this._resolvesQuery( item, query ) )
             {
                 return obj;
             }

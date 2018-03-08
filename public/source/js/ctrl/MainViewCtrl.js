@@ -1,5 +1,6 @@
 const $ = require("jquery");
-
+const Authenticator = require("../service/Authenticator");
+const Router = require("../service/Router");
 
 class MainViewController {
 
@@ -16,10 +17,18 @@ class MainViewController {
     dettach()
     {
         // todo: stop loadData and remove nodes...
+        console.log("dettach main...");
+        this.boilerplate.parentNode.removeChild( this.boilerplate );
     }
 
     attach()
     {
+
+        if( !Authenticator.isAuthenticated() )
+        {
+            Router.go("login");
+        }
+
         this.lastUpdateTimestamp = null;
 
         this.boilerplate = document.createElement("div");
@@ -101,6 +110,7 @@ class MainViewController {
     loadData()
     {
         // TODO: use WebSockets
+        if( !this.active ) return;
         let url = "/api/post" + ( this.lastUpdateTimestamp ? "?timestamp=" + this.lastUpdateTimestamp : "" );
         this.lastUpdateTimestamp = Date.now();
         $.get( url ).then( data => {
@@ -110,7 +120,7 @@ class MainViewController {
             });
             setTimeout( this.loadData.bind( this ), 1000 );
         }).catch((error) => {
-            console.error("Cannot get data...");
+            console.error("Cannot get data...");            
             setTimeout( this.loadData.bind( this ), 1000 );
         });
     }
