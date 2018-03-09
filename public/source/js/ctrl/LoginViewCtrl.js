@@ -42,7 +42,8 @@ class LoginViewCtrl
                 <label>Passwort</label>
                 <input type="text" id="login-password" placeholder="Passwort" />
             </div>
-            <button type="submit" class="primary">Anmelden</button>
+            <button type="submit" class
+            ="primary">Anmelden</button>
         `;
         this.loginForm.onsubmit = e =>
         {
