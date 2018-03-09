@@ -1,11 +1,11 @@
-const controllers = [
+const controllers = [    
     require("../ctrl/MainViewCtrl"),
     require("../ctrl/LoginViewCtrl")
 ];
 
 const routes = {       
-    'login': [ 'login', 'main' ],
-    '*': [ 'main' ]
+    'login': [ 'login' ],
+    '*': ['main']
 };
 
 module.exports.routes = routes;
