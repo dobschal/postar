@@ -51,6 +51,9 @@ class LoginViewCtrl
             const password = $("#login-password").val();
             $.post("/api/user/login", { username: username, password: password }).then( token => {
                 Authenticator.persistToken( token );
+                $.ajaxSetup({
+                    headers: { 'Auth-Token': Authenticator.getToken() }
+                });
                 Router.go("main");
             }).catch( err => {
                 dialog("Fehler", "Falsches Passwort?", "error");

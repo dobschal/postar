@@ -247,8 +247,8 @@ function connect() {
                 reject();
                 return;
             }
-            console.log("Connected to database...");            
-            db = client.db("postar");
+            console.log("Connected to database...");
+            db = client.db("postar"); // newer version of mongo client
             resolve();
         });
     });

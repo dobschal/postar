@@ -7,6 +7,7 @@ const minStartTime  = 1520451351897;
 const pixelPerTime  = 60 * 1000;
 const clickTolerance = 300;
 
+// TODO: caluclate the timeframeIndex by screen widht
 let timeframeIndex  = 8;
 let start           = true;
 let startTime       = Date.now() - (1000 * 60 * 60 * timeframeIndex);
@@ -22,18 +23,19 @@ class MainViewController {
         this.items = {};
         this.isTimeframeRefresh = false;
         this.spinnerNode = null;
+        this.users = {};
     }
 
     routeChanged()
     {
-        console.log("main routeChanged");
+        console.log("TODO: main routeChanged");
     }
 
     dettach()
     {
-        // todo: stop loadData and remove nodes...
-        console.log("dettach main...");
-        this.boilerplate.parentNode.removeChild( this.boilerplate );
+        this.items = [];
+        ViewHelper.remove( this.logoutButton );
+        ViewHelper.remove( this.boilerplate );
     }
 
     attach()
@@ -44,7 +46,7 @@ class MainViewController {
             Router.go("login");
         }
 
-        this.lastUpdateTimestamp = null;
+        this.lastUpdateTimestamp = null;        
 
         this.boilerplate = document.createElement("div");
         this.boilerplate.id = "area";        
@@ -64,8 +66,8 @@ class MainViewController {
                 return alert("Out of Range");
             }
 
-            this.attachPost( xNow + offsetX, y, "", ( content, newContentNode ) => {
-                this.saveNewPost.call( { contentNode: newContentNode, content: content, x: offsetX, y: y, timestamp: timestamp } , null );
+            this.attachPost( xNow + offsetX, y, "", "", ( content, newContentNode ) => {
+                this.saveNewPost.call( { contentNode: newContentNode, content: content, x: offsetX, y: y, timestamp: timestamp, context: this } , null );
             });        
         };
 
@@ -75,6 +77,13 @@ class MainViewController {
         this.spinnerNode = ViewHelper.create( "div.loader", this.boilerplate );
         this.spinnerNode.innerHTML = "loading...";
         this.spinnerNode.style.display = "block";
+
+        this.logoutButton = ViewHelper.create("button.logout", this.bodyNode);
+        this.logoutButton.innerHTML = "Abmelden";
+        this.logoutButton.onclick = e =>
+        {
+            Authenticator.logout();
+        };
 
         start = true;
 
@@ -119,15 +128,24 @@ class MainViewController {
         const timestamp = this.timestamp;
 
         $.post("/api/post",  { content: content, x: x, y: y, timestamp: timestamp }).then((response) => {
-            console.log( "New post: ", response );
-            //this.contentNode.parentNode.parentNode.removeChild( this.contentNode.parentNode );
+            let { success, post } = response;
+            this.contentNode.parentNode.parentNode.removeChild( this.contentNode.parentNode );
+            let { _id, x:offsetX, y, content, timestamp } = post;
+            let x = (timestamp - startTime) / pixelPerTime + parseInt(offsetX);
+            if( this.context.items[ _id ] )
+            {
+                this.context.items[ _id ].node.style.left = `${x}px`;
+                return;
+            }                
+            post.node = this.context.attachPost( x, y, content );
+            this.context.items[ _id ] = post;
         }).catch(err => {
             // TODO: handle error
             console.error( err );
         });
     }
 
-    attachPost( x, y, content, editableCallback )
+    attachPost( x, y, content, username, editableCallback )
     {        
         let newNode = document.createElement("div");
             newNode.className = "new-post";
@@ -140,7 +158,7 @@ class MainViewController {
 
         if( typeof content === "string" )
         {
-            newContentNode.innerHTML = content;
+            newContentNode.innerHTML = "<small>" + username + "</small><br>" + content;
         }
         
         newNode.appendChild( newContentNode );
@@ -172,6 +190,44 @@ class MainViewController {
         return newNode;
     }
 
+    loadUsers()
+    {
+        for (const userId in this.users) {
+            if (this.users.hasOwnProperty(userId)) {
+                const user = this.users[userId];
+                if( !user.loaded && !user.isLoading )
+                {
+                    user.isLoading = true;
+                    $.get("/api/user/" + userId ).then( response => {
+                        // TODO: take user from response and put into users object...
+                    });
+                }
+            }
+        }
+    }
+
+    getUser( userId, callback )
+    {
+        if( !this.users[ userId ] )
+        {
+            this.users[ userId ] = "loading";
+            $.get("/api/user/" + userId ).then( user => {
+                this.users[ userId ] = user;
+                callback( this.users[ userId ] );
+            });
+        }
+        else if( this.users[ userId ] === "loading" )
+        {
+            setTimeout( () => {
+                this.getUser.call( this, userId, callback );
+            }, 500 );
+        }
+        else
+        {
+            callback( this.users[ userId ] );
+        }
+    }
+
     loadData()
     {
         // TODO: use WebSockets
@@ -181,16 +237,20 @@ class MainViewController {
         
         $.get( url ).then( data => {
             data.forEach( item => {
-                let { _id, x:offsetX, y, content, timestamp } = item;
+                let { _id, x:offsetX, y, content, timestamp, userId } = item;
                 let x = (timestamp - startTime) / pixelPerTime + parseInt(offsetX);
                 if( this.items[ _id ] )
                 {
                     this.items[ _id ].node.style.left = `${x}px`;
                     return;
-                }                
-                item.node = this.attachPost( x, y, content );
-                this.items[ _id ] = item;
+                }
+                
+                this.getUser( userId, user => {
+                    item.node = this.attachPost( x, y, content, user.username );
+                    this.items[ _id ] = item;
+                });
             });
+            this.loadUsers();
             if( this.isTimeframeRefresh )
             {
                 this.spinnerNode.style.display = "none";
@@ -205,10 +265,11 @@ class MainViewController {
                 start = false;
                 this.applyScrollHandler();
             }
+            console.log("data: ", data);
             setTimeout( this.loadData.bind( this ), 100 );
         }).catch((error) => {
             console.error("Cannot get data...");            
-            setTimeout( this.loadData.bind( this ), 100 );
+            setTimeout( this.loadData.bind( this ), 3000 );
         });
     }
 

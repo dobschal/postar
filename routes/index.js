@@ -1,3 +1,4 @@
+
 const express = require('express');
 const router = express.Router();
 const db = require("../service/db");
@@ -5,30 +6,59 @@ const hash = require("../service/hash/sha512");
 const config = require("../config");
 const mongodb = require("mongodb");
 const ObjectId = mongodb.ObjectID;
+const Authenticator = require("../service/Authenticator");
 
-router.post('/api/post', function(req, res, next) {    
-    const { content, x, y, timestamp } = req.body;
-    const post = { content: content, x: x, y: y, timestamp: timestamp, _id: new ObjectId() };
+// - - - - - - - - - - - - - - - - - - POSTS - - - - - - - - - - - - - - - - - - 
 
-    db.insert("post", post, error => {
-        if( error)
-        {
-            res.status(500).send({ error: error });  
-        }
-        console.log("Added new post...", post);
-        res.status(200).send({ success: "Saved post.", post: post });  
-    });    
+router.post('/api/post', function(req, res, next) {
+    
+    Authenticator.secure( req, res, ["user", "admin"]).then(( userId ) => {
+    
+        const { content, x, y, timestamp } = req.body;
+        const post = { content: content, x: x, y: y, timestamp: timestamp, _id: new ObjectId(), userId: userId };
+
+        db.insert("post", post, error => {
+            if( error)
+            {
+                res.status(500).send({ error: error });  
+            }
+            console.log("Added new post...", post);
+            res.status(200).send({ success: "Saved post.", post: post });  
+        });
+    });
 });
 
 router.get('/api/post', function(req, res, next) {
+    
+    let userId = Authenticator.secure( req, res, ["user", "admin"]);
+
+    console.log(`User ${userId} reads posts...`);
+    
     let index = 0;
     getItems( req, res, index, items => {
         res.status(200).send( items );
     });
 });
 
+
+// - - - - - - - - - - - - - - - - - - USER - - - - - - - - - - - - - - - - - - 
+
+router.get('/api/user/:id', function(req, res, next) {    
+    var { id } = req.params;
+
+    if( !id ) return res.status( 400 ).send({ error: "Missing user id in parameters..." });
+
+    db.get("user", id, ( error, users ) => {
+        if( error)
+        {
+            return res.status(500).send({ error: error });  
+        }
+        res.status( 200 ).send( users[0] );
+    });
+});
+
 router.post('/api/user/add', function(req, res, next) {    
-    const { username, password } = req.body;
+    var { username, password } = req.body;
 
     db.get("user", { username: username }, (error, data) => {
         if( error)
@@ -39,7 +69,7 @@ router.post('/api/user/add', function(req, res, next) {
         {
             return res.status( 409 ).send({error: "user already exists."});
         }
-        db.insert("user", { username: username, password: hash( password ), timestamp: Date.now() }, error => {
+        db.insert("user", { username: username, password: hash( password ), timestamp: Date.now(), role: "user" }, error => {
             if( error)
             {
                 res.status(500).send({ error: error });  
@@ -50,7 +80,7 @@ router.post('/api/user/add', function(req, res, next) {
 });
 
 router.post('/api/user/login', function(req, res, next) {    
-    const { username, password } = req.body;
+    var { username, password } = req.body;
 
     db.get("user", { username: username }, (error, data) => {
         if( error)

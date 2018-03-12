@@ -1,4 +1,5 @@
 const Storage = require("./Storage");
+const Router = require("./Router");
 
 class Authenticator
 {
@@ -22,6 +23,26 @@ class Authenticator
         let user = JSON.parse( userAsString );
             user.token = token;
         Storage.insert("user", user);
+    }
+
+    static getUser()
+    {
+        const users = Storage.get("user", {});
+        if( users.length !== 1 ) return false;
+        const user = users[ 0 ];
+        return user;
+    }
+
+    static getToken()
+    {
+        const user = this.getUser();
+        return user.token;
+    }
+
+    static logout()
+    {
+        Storage.remove( "user", {} );
+        Router.go("login");
     }
 }
 
